@@ -64,7 +64,8 @@ azreader.exe export2file -config=c:\\path\\to\\custom.conf.json
   "consumerGroup": "required string",
   "eventhubConnString": "required string",
   "entityPath": "required string",
-  "readToFile": "optional bool (default: false)",
+  "env": "required string",
+  "readToFile": "optional bool (default: false)",  
   "messageDumpDir": "optional string (default: .\\.data-dump\\eventhub)",
   "badgerBase": "optional string (default: .\\.appdata)",
   "badgerDir": "optional string (default: .\\.appdata\\dir)",
@@ -72,7 +73,7 @@ azreader.exe export2file -config=c:\\path\\to\\custom.conf.json
   "badgerValueLogFileSize": "optional int64 (default: 1024 * 1024 * 10)",
   "badgerSkipCompactL0OnClose": "optional bool (default: false)",
   "badgerVerbose": "optional bool (default: false)",
-  "dumpOnlyMessageData": "optional bool (default: false)"
+  "dumpOnlyMessageData": "optional bool (default: false)"  
 }
 ```
 ### Config file Properties
@@ -88,6 +89,7 @@ azreader.exe export2file -config=c:\\path\\to\\custom.conf.json
 - **badgerSkipCompactL0OnClose**: if true, will skip compacting the database on close (will speed up things, but will use more storage)
 - **badgerVerbose**: if true, will let badger print a bunch of logs.
 - **dumpOnlyMessageData**: if true, when dumping a message to disk, will only write the message content (and skip writing all the other message details)
+- **env**: name that will be appended to the badger directory. This means keeping messages from development, qa, production, etc. separate.
 
 
 

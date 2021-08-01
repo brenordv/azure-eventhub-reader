@@ -49,11 +49,12 @@ type config struct {
 	ReadToFile                 bool   `json:"readToFile"`
 	ConsumerGroup              string `json:"consumerGroup"`
 	DumpOnlyMessageData        bool   `json:"dumpOnlyMessageData"`
+	Env                        string `json:"env"`
 }
 
 // application constants
 const (
-	version                = "1.0.0.0"
+	version                = "1.0.1.0"
 	badgerBase             = ".\\.appdata"
 	badgerDir              = ".\\.appdata\\dir"
 	badgerValueDir         = ".\\.appdata\\valueDir"
@@ -131,9 +132,15 @@ func loadConfig(f string, op string) {
 	err = jsonParser.Decode(&currentConfig)
 	handleError(fmt.Sprintf("Failed to read config file: %s", f), err, true)
 
+	if currentConfig.Env == "" {
+		handleError(errMsg,
+			errors.New("key 'env' is missing or empty"),
+			true)
+	}
+
 	if currentConfig.EntityPath == "" {
 		handleError(errMsg,
-			errors.New("key 'entityPath' is missing"),
+			errors.New("key 'entityPath' is missing or empty"),
 			true)
 	}
 
@@ -153,11 +160,11 @@ func loadConfig(f string, op string) {
 	}
 
 	if currentConfig.BadgerDir == "" {
-		currentConfig.BadgerDir = filepath.Join(bDir, badgerDir)
+		currentConfig.BadgerDir = filepath.Join(filepath.Join(bDir, badgerDir), currentConfig.Env)
 	}
 
 	if currentConfig.BadgerValueDir == "" {
-		currentConfig.BadgerValueDir = filepath.Join(bDir, badgerValueDir)
+		currentConfig.BadgerValueDir = filepath.Join(filepath.Join(bDir, badgerValueDir), currentConfig.Env)
 	}
 
 	if currentConfig.MessageDumpDir == "" {
