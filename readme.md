@@ -6,7 +6,7 @@ When running this application, it will try to create all folders needed.
 If we don't have enough permissions and the folders do not exist, execution will fail.
 
 My initial aim was to be able to log 1.000.000 messages/day. Considering the benchmark (see bellow), 
-I can say this goal is achieved.
+I can say this goal was achieved.
 
 Another important note is: This application was not tested for long term usage. 
 Although BadgerDb can handle hundreds of terabytes of data, I have not tested it. 
