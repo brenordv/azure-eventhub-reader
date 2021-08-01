@@ -16,14 +16,14 @@ Although BadgerDb can handle hundreds of terabytes of data, I have not tested it
 - ```export2file```: reads the database and saves every message to disk. Reading is made in reverse, so last messages will be dumped to disk first. 
 
 ## About saving messages to disk.
-Inside ```messageDumpDir```, will be created a folder for each day (YYYY-MM-DD). Messges for that day will
+Inside ```messageDumpDir```, will be created a folder for each day (YYYY-MM-DD). Messages for that day will
 be saved inside that folder. The filename is based on the timestamp of when the message was processed + it's id. 
 If the file already exist, it will not be overwritten.
 
 ## Benchmark
-- Reading messages and logging to database: ~300 messages per second
-- Reading messages, logging to database and dumping to disk: ~25 messages per second
-- Exporting all logged messages to disk: ~25 messages per second
+- Reading messages and logging to database: ~300 messages per second (about 25 million messages / day) 
+- Reading messages, logging to database and dumping to disk: ~25 messages per second (about 2.1 million messages / day)
+- Exporting all logged messages to disk: ~25 messages per second (about 2.1 million messages / day)
 
 
 ## How to use
