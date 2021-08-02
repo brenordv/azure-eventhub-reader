@@ -96,3 +96,7 @@ azreader.exe export2file -config=c:\\path\\to\\custom.conf.json
 Notes:
 1. The option ```readToFile``` will greatly slow down reading process. You can always export everything later.
 2. All optional paths a relative to where the executable is located.
+
+
+# TODO
+1. Clean this code and do a bunch of refactoring...
