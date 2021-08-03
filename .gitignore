@@ -4,6 +4,7 @@
 *.conf.json
 .appdata
 .data-dump
+.outbound
 *.exe
 *.zip
 

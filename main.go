@@ -12,6 +12,7 @@ import (
 	"github.com/dgraph-io/badger/v3"
 	"github.com/schollz/progressbar/v3"
 	"io"
+	"io/ioutil"
 	"log"
 	"os"
 	"os/signal"
@@ -20,6 +21,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"sync"
 	"time"
 )
 
@@ -50,15 +52,19 @@ type config struct {
 	ConsumerGroup              string `json:"consumerGroup"`
 	DumpOnlyMessageData        bool   `json:"dumpOnlyMessageData"`
 	Env                        string `json:"env"`
+	OutboundFolder             string `json:"outboundFolder"`     // TODO: Add this to readme.md
+	OutboundFolderSent         string `json:"outboundFolderSent"` // TODO: Add this to readme.md
 }
 
 // application constants
 const (
-	version                = "1.0.1.0"
+	version                = "1.1.0.0"
 	badgerBase             = ".\\.appdata"
 	badgerDir              = ".\\.appdata\\dir"
 	badgerValueDir         = ".\\.appdata\\valueDir"
 	messageDumpDir         = ".\\.data-dump\\eventhub"
+	outboundFolder         = ".\\.outbound"
+	outboundFolderSent     = ".\\.outbound\\.sent"
 	readToFile             = false
 	colorBlue              = "\033[34m"
 	colorReset             = "\033[0m"
@@ -95,6 +101,10 @@ func main() {
 		exportToFile()
 		break
 
+	case "write":
+		log.Println(fmt.Sprintf("Preparing to send all files in outbound folder '%s' as messages to Eventhub...",
+			currentConfig.OutboundFolder))
+		sendToEventhub()
 	default:
 		log.Println(fmt.Sprintf("Operation '%s' is not supported.", operation))
 	}
@@ -106,7 +116,7 @@ func wrapUpExecution() {
 		err := pBar.Close()
 		handleError("Failed to close progress bar.", err, false)
 	}
-	fmt.Println(fmt.Sprintf("\nAll done! (elapsed time: %s)", time.Since(start)))
+	log.Println(fmt.Sprintf("\nAll done! (elapsed time: %s)", time.Since(start)))
 	os.Exit(exitCode)
 }
 
@@ -171,11 +181,24 @@ func loadConfig(f string, op string) {
 		currentConfig.MessageDumpDir = filepath.Join(bDir, messageDumpDir)
 	}
 
+	if currentConfig.OutboundFolder == "" {
+		currentConfig.OutboundFolder = filepath.Join(bDir, outboundFolder)
+	}
+
+	if currentConfig.OutboundFolderSent == "" {
+		currentConfig.OutboundFolderSent = filepath.Join(bDir, outboundFolderSent)
+	}
+
 	ensureDirExists(currentConfig.BadgerBase)
 	ensureDirExists(currentConfig.BadgerDir)
 	ensureDirExists(currentConfig.BadgerValueDir)
 	if op == "export2file" || currentConfig.ReadToFile {
 		ensureDirExists(currentConfig.MessageDumpDir)
+	}
+
+	if op == "write" {
+		ensureDirExists(currentConfig.OutboundFolder)
+		ensureDirExists(currentConfig.OutboundFolderSent)
 	}
 }
 
@@ -258,6 +281,46 @@ func exportToFile() {
 	closeThePub()
 }
 
+// sendToEventhub will watch a folder and send every new file as a message to eventhub.
+func sendToEventhub() {
+	ctx, hub := getEventHubClient(currentConfig.EventhubConnectionString, currentConfig.EntityPath)
+	defer func(hub *eventhub.Hub, ctx context.Context) {
+		err := hub.Close(ctx)
+		if err != nil {
+			handleError("Failed to close eventhub client.", err, true)
+		}
+	}(hub, ctx)
+
+	var wg sync.WaitGroup
+	pending, pendingCount := listFiles(currentConfig.OutboundFolder)
+	pBar = progressbar.Default(
+		int64(pendingCount),
+		"Sending files...",
+	)
+
+	for _, f := range pending {
+		wg.Add(1)
+		go func(f string, hub *eventhub.Hub, ctx context.Context, wg *sync.WaitGroup) {
+			defer wg.Done()
+			fContent := readTextFile(f)
+			err := hub.Send(ctx, eventhub.NewEventFromString(fContent))
+			_ = pBar.Add(1)
+			handleError(fmt.Sprintf("Failed to send file '%s' to eventhub.", f),
+				err, true)
+
+			var fi os.FileInfo
+			fi, err = os.Stat(f)
+			handleError(fmt.Sprintf("Failed to get status of file '%s'.", f), err, true)
+
+			moveFile(f,
+				filepath.Join(currentConfig.OutboundFolderSent,
+					fmt.Sprintf("%s--%s", time.Now().Format("2006-01-02T15-04-05.000000000"), fi.Name())))
+		}(f, hub, ctx, &wg)
+	}
+
+	wg.Wait()
+}
+
 // waitForUserInterruption will wait for the user to stop execution to continue.
 // this means that any code after this method will only run after the ser presses Ctrl+C or something like that.
 func waitForUserInterruption() {
@@ -269,6 +332,17 @@ func waitForUserInterruption() {
 
 // StartReceivingMessages will create an instance of Eventhub Consumer and wait for messages.
 func startReceivingMessages(connectionString string, entityPath string) {
+	var err error
+	ctx, hub := getEventHubClient(connectionString, entityPath)
+
+	_, err = hub.Receive(ctx, "0", onMsgReceived, eventhub.ReceiveWithConsumerGroup(currentConfig.ConsumerGroup))
+	if err != nil {
+		fmt.Println(err.Error())
+		os.Exit(1)
+	}
+}
+
+func getEventHubClient(connectionString string, entityPath string) (context.Context, *eventhub.Hub) {
 	ctx := context.Background()
 
 	if !strings.Contains(connectionString, ";EntityPath=") {
@@ -276,15 +350,15 @@ func startReceivingMessages(connectionString string, entityPath string) {
 	}
 
 	hub, err := eventhub.NewHubFromConnectionString(connectionString)
-	if err != nil {
-		panic(err)
-	}
+	handleError("Failed to create new EventHub client from connection string", err, true)
 
-	_, err = hub.Receive(ctx, "0", onMsgReceived, eventhub.ReceiveWithConsumerGroup(currentConfig.ConsumerGroup))
-	if err != nil {
-		fmt.Println(err.Error())
-		os.Exit(1)
-	}
+	info, e := hub.GetRuntimeInformation(ctx)
+	handleError("Failed to get runtime information", e, true)
+
+	log.Printf("Runtime started at '%s', pointing at path '%s' with %d partitions. Available partitions: %s\n",
+		info.CreatedAt, info.Path, info.PartitionCount, info.PartitionIDs)
+
+	return ctx, hub
 }
 
 // OnMsgReceived is the handler for received messages on eventhub.
@@ -375,7 +449,7 @@ func openConnection() *badger.DB {
 }
 
 // closeThePub closes the connection to badgerDb, if it's open.
-func closeThePub() {
+func closeThePub() { // TODO: rename this to a more sensible name.
 	if badgerConnection == nil || badgerConnection.IsClosed() {
 		return
 	}
@@ -534,7 +608,7 @@ func parseCommandLine() (string, string) {
 	var err error
 	var configFile string
 
-	if verb != "read" && verb != "export2file" {
+	if verb != "read" && verb != "export2file" && verb != "write" {
 		flag.PrintDefaults()
 		exitCode = 0
 		runtime.Goexit()
@@ -559,4 +633,34 @@ func getAppDir() string {
 		appDir = path.Dir(execPath)
 	}
 	return appDir
+}
+
+// readTextFile will read a text file and return it's content. If something goes wrong, will explode.
+func readTextFile(f string) string {
+	content, err := ioutil.ReadFile(f)
+	handleError(fmt.Sprintf("Failed to read file '%s'", f), err, true)
+	return string(content)
+}
+
+func listFiles(dir string) ([]string, int) {
+	files, err := ioutil.ReadDir(dir)
+	var filenames []string
+	handleError(fmt.Sprintf("Failed to list files in directory '%s'.", dir), err, true)
+
+	for _, file := range files {
+		fName := filepath.Join(dir, file.Name())
+		fstat, err := os.Stat(fName)
+
+		if err != nil || fstat.IsDir() {
+			continue
+		}
+		filenames = append(filenames, fName)
+	}
+
+	return filenames, len(files)
+}
+
+func moveFile(old string, new string) {
+	err := os.Rename(old, new)
+	handleError(fmt.Sprintf("Failed to move file '%s' to '%s'", old, new), err, true)
 }
