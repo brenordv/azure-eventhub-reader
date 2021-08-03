@@ -14,6 +14,7 @@ Although BadgerDb can handle hundreds of terabytes of data, I have not tested it
 ## Operations supported
 - ```read```: continuously read from eventhub and log every message to the database (and to file, if configured to do it)
 - ```export2file```: reads the database and saves every message to disk. Reading is made in reverse, so last messages will be dumped to disk first. 
+- ```write```: for every file in the outbound directory, a message will be sent to eventhub.
 
 ## About saving messages to disk.
 Inside ```messageDumpDir```, will be created a folder for each day (YYYY-MM-DD). Messages for that day will
@@ -28,7 +29,7 @@ If the file already exist, it will not be overwritten.
 
 ## How to use
 ```shell
-azreader.exe <operation> [-config=<configuration file>]
+hubtools.exe <operation> [-config=<configuration file>]
 ```
 
 In the commandline, only the operation is required. However, a configuration file is also required.
@@ -39,29 +40,29 @@ If no config file is available, the execution will fail.
 ## Examples
 ### Read using default config file
 ```shell
-azreader.exe read
+hubtools.exe read
 ```
 
 ### Read using custom config file
 ```shell
-azreader.exe read -config=c:\\path\\to\\custom.conf.json
+hubtools.exe read -config=c:\\path\\to\\custom.conf.json
 ```
 
 ### Export all messages using default config file
 ```shell
-azreader.exe export2file
+hubtools.exe export2file
 ```
 
 ### Read using custom config file
 ```shell
-azreader.exe export2file -config=c:\\path\\to\\custom.conf.json
+hubtools.exe export2file -config=c:\\path\\to\\custom.conf.json
 ```
 
 
 ## How to create a configuration file
 ```json
 {
-  "consumerGroup": "required string",
+  "consumerGroup": "required (for reading only) string",
   "eventhubConnString": "required string",
   "entityPath": "required string",
   "env": "required string",
@@ -73,7 +74,10 @@ azreader.exe export2file -config=c:\\path\\to\\custom.conf.json
   "badgerValueLogFileSize": "optional int64 (default: 1024 * 1024 * 10)",
   "badgerSkipCompactL0OnClose": "optional bool (default: false)",
   "badgerVerbose": "optional bool (default: false)",
-  "dumpOnlyMessageData": "optional bool (default: false)"  
+  "dumpOnlyMessageData": "optional bool (default: false)",
+  "outboundFolder": "optional string (default: .\\.outbound)",
+  "outboundFolderSent": "optional string (default: .\\.outbound\\.sent)",
+  "dontMoveSentFiles": "optional bool (default: false)"
 }
 ```
 ### Config file Properties
@@ -90,6 +94,9 @@ azreader.exe export2file -config=c:\\path\\to\\custom.conf.json
 - **badgerVerbose**: if true, will let badger print a bunch of logs.
 - **dumpOnlyMessageData**: if true, when dumping a message to disk, will only write the message content (and skip writing all the other message details)
 - **env**: name that will be appended to the badger directory. This means keeping messages from development, qa, production, etc. separate.
+- **outboundFolder**: every file in this folder will be sent to eventhub as a single message.
+- **outboundFolderSent**: after sending each message, by default, the associated file will be moved to this directory
+- **dontMoveSentFiles**: if true, will not move the file after sending it as message.
 
 
 

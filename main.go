@@ -54,6 +54,7 @@ type config struct {
 	Env                        string `json:"env"`
 	OutboundFolder             string `json:"outboundFolder"`     // TODO: Add this to readme.md
 	OutboundFolderSent         string `json:"outboundFolderSent"` // TODO: Add this to readme.md
+	DontMoveSentFiles          bool   `json:"dontMoveSentFiles"`  // TODO: Add this to readme.md
 }
 
 // application constants
@@ -154,9 +155,9 @@ func loadConfig(f string, op string) {
 			true)
 	}
 
-	if currentConfig.ConsumerGroup == "" {
+	if currentConfig.ConsumerGroup == "" && op == "read" {
 		handleError(errMsg,
-			errors.New("key 'consumerGroup' is missing and I'll not assume $default"),
+			errors.New("key 'consumerGroup' is missing and I'll not assume $default. really need a consumerGroup to be able to read"),
 			true)
 	}
 
@@ -311,6 +312,10 @@ func sendToEventhub() {
 			var fi os.FileInfo
 			fi, err = os.Stat(f)
 			handleError(fmt.Sprintf("Failed to get status of file '%s'.", f), err, true)
+
+			if currentConfig.DontMoveSentFiles{
+				return
+			}
 
 			moveFile(f,
 				filepath.Join(currentConfig.OutboundFolderSent,
