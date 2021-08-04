@@ -25,6 +25,7 @@ If the file already exist, it will not be overwritten.
 - Reading messages and logging to database: ~300 messages per second (about 25 million messages / day) 
 - Reading messages, logging to database and dumping to disk: ~25 messages per second (about 2.1 million messages / day)
 - Exporting all logged messages to disk: ~25 messages per second (about 2.1 million messages / day)
+- Writing/Sending messages: ~450 messages per second (about 38.8 million messages / day)
 
 
 ## How to use
