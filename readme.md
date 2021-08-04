@@ -58,6 +58,17 @@ hubtools.exe export2file
 hubtools.exe export2file -config=c:\\path\\to\\custom.conf.json
 ```
 
+### Send messages using default config file
+First: place a file for each message in the ```OutboundFolder```.
+```shell
+hubtools.exe write
+```
+
+### Send messages using default config file
+Same as the previous example. First you should place a file for each message in the ```OutboundFolder```.
+```shell
+hubtools.exe write -config=c:\\path\\to\\custom.conf.json
+```
 
 ## How to create a configuration file
 ```json
@@ -81,7 +92,7 @@ hubtools.exe export2file -config=c:\\path\\to\\custom.conf.json
 }
 ```
 ### Config file Properties
-- **consumerGroup**: Name of the consumer group that will be used. Must inform even if it's the default one.
+- **consumerGroup**: Name of the consumer group that will be used. Must inform even if it's the default one. This property is required only for reading messages.
 - **eventhubConnString**: connection string that will be used to connect to Eventhub.
 - **entityPath**: The entity path (name of the eventhub) that will be read.
 - **readToFile**: If true will log each message to the database and save it to disk.
