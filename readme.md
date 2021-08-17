@@ -1,3 +1,6 @@
+# Attention!
+This repository is archived/abandoned! Please, refer to: https://github.com/brenordv/azure-eventhub-tools
+
 # Azure Eventhub Reader
 This application has a couple of tools to interact with Azure Eventhub.
 I use BadgerDb as database to log received messages.
